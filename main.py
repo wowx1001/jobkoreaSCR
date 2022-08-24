@@ -305,7 +305,7 @@ class jobkrSCR:
                 except:
                     email = 'None' #기업링크 연결 요청이 안 될 경우 이메일 수집 포기
                 else:
-                    email = self.soup_scrap(soup)
+                    email = self.soup_scrap(soup, response.content)
                     if(email=='None' or email=='' or email==False):
                         redirect_url = self.redirect_url_return(u)
                         try:
@@ -315,7 +315,7 @@ class jobkrSCR:
                         except:
                             email = 'None'
                         else:
-                            email = self.soup_scrap(soup)
+                            email = self.soup_scrap(soup, response.content)
                 finally:
                     comp_email.append(email)
             else:
@@ -414,7 +414,7 @@ class jobkrSCR:
         else:
             return False
 
-    def soup_scrap(self, soup):
+    def soup_scrap(self, soup, res):
         email = ''
         # 불필요한 태그 제거
         script_tag = soup.find_all(['script', 'style', 'head'])
@@ -425,6 +425,13 @@ class jobkrSCR:
         # html 문서 행 분리
         content = soup.get_text('\n', strip=True)
         html_split = content.split("\n")
+
+        # 문서 행 분리 시 컨텐츠가 비어있을경우
+        if(html_split==''):
+            soup = self.change_parser(res)
+            # html 문서 행 재 분리
+            content = soup.get_text('\n', strip=True)
+            html_split = content.split("\n")
 
         # 메일 추출
         for row in html_split:
@@ -440,6 +447,11 @@ class jobkrSCR:
             except:
                 pass
         return email
+
+    # html 문서 변환 형식 변경
+    def change_parser(self,res):
+        soup = BeautifulSoup(res, "html5lib")
+        return soup
 
 obj = jobkrSCR()
 while True:
