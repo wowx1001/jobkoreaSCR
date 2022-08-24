@@ -306,7 +306,7 @@ class jobkrSCR:
                     email = 'None' #기업링크 연결 요청이 안 될 경우 이메일 수집 포기
                 else:
                     email = self.soup_scrap(soup)
-                    if(not email):
+                    if(email=='None' or email=='' or email==False):
                         redirect_url = self.redirect_url_return(u)
                         try:
                             response = requests.get(redirect_url, timeout=100,
