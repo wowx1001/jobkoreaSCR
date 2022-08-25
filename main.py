@@ -305,7 +305,7 @@ class jobkrSCR:
                 except:
                     email = 'None' #기업링크 연결 요청이 안 될 경우 이메일 수집 포기
                 else:
-                    email = self.soup_scrap(soup, response.content)
+                    email = self.soup_scrap(soup, u)
                     if(email=='None' or email=='' or email==False):
                         redirect_url = self.redirect_url_return(u)
                         try:
@@ -315,7 +315,7 @@ class jobkrSCR:
                         except:
                             email = 'None'
                         else:
-                            email = self.soup_scrap(soup, response.content)
+                            email = self.soup_scrap(soup, redirect_url)
                 finally:
                     comp_email.append(email)
             else:
@@ -326,7 +326,7 @@ class jobkrSCR:
         self.sch = pd.concat([self.sch, last_em_df], axis=1)
         self.sch.to_excel("./results/기업정보_최종_산출물" + datetime.today().strftime("%Y%m%d%H%M%S") + ".xlsx", index=False)
 
-    #최종 산출물 전처리
+    #최종 산출물 전처리 데이터 병합&중복처리
     def run_4th_script(self):
         # 전처리
         merge_df = pd.DataFrame()
@@ -414,7 +414,8 @@ class jobkrSCR:
         else:
             return False
 
-    def soup_scrap(self, soup, res):
+    # 데이터 크롤링
+    def soup_scrap(self, soup, url):
         email = ''
         # 불필요한 태그 제거
         script_tag = soup.find_all(['script', 'style', 'head'])
@@ -428,8 +429,9 @@ class jobkrSCR:
 
         # 문서 행 분리 시 컨텐츠가 비어있을경우
         if(html_split==''):
-            soup = self.change_parser(res)
-            # html 문서 행 재 분리
+            self.driver.get(url)
+            html = self.driver.page_source
+            soup = BeautifulSoup(html, 'html.parser')
             content = soup.get_text('\n', strip=True)
             html_split = content.split("\n")
 
