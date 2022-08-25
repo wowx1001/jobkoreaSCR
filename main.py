@@ -1,5 +1,6 @@
 from selenium import webdriver
 from selenium.webdriver.common.keys import Keys
+from selenium.webdriver.support.ui import WebDriverWait
 import pandas as pd
 import time
 from datetime import datetime
@@ -23,6 +24,7 @@ class jobkrSCR:
 
         # (가상머신)드라이버 실행
         self.driver = webdriver.Chrome('./chromedriver.exe')
+        self.driver.set_page_load_timeout(10)
         self.headers = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/102.0.0.0 Safari/537.36'}
 
@@ -305,7 +307,7 @@ class jobkrSCR:
                 except:
                     email = 'None' #기업링크 연결 요청이 안 될 경우 이메일 수집 포기
                 else:
-                    email = self.soup_scrap(soup, u)
+                    email = self.soup_scrap(bs = soup, url = u)
                     if(email=='None' or email=='' or email==False):
                         redirect_url = self.redirect_url_return(u)
                         try:
@@ -315,7 +317,7 @@ class jobkrSCR:
                         except:
                             email = 'None'
                         else:
-                            email = self.soup_scrap(soup, redirect_url)
+                            email = self.soup_scrap(bs = soup, url = redirect_url)
                 finally:
                     comp_email.append(email)
             else:
@@ -415,25 +417,17 @@ class jobkrSCR:
             return False
 
     # 데이터 크롤링
-    def soup_scrap(self, soup, url):
+    def soup_scrap(self, bs, url, res=''):
         email = ''
         # 불필요한 태그 제거
-        script_tag = soup.find_all(['script', 'style', 'head'])
+        script_tag = bs.find_all(['script', 'style', 'head'])
 
         for script in script_tag:
             script.extract()
 
         # html 문서 행 분리
-        content = soup.get_text('\n', strip=True)
+        content = bs.get_text('\n', strip=True)
         html_split = content.split("\n")
-
-        # 문서 행 분리 시 컨텐츠가 비어있을경우
-        if(html_split==''):
-            self.driver.get(url)
-            html = self.driver.page_source
-            soup = BeautifulSoup(html, 'html.parser')
-            content = soup.get_text('\n', strip=True)
-            html_split = content.split("\n")
 
         # 메일 추출
         for row in html_split:
@@ -442,9 +436,30 @@ class jobkrSCR:
                 email = mail[0]
                 break
 
-        if (not email):
+        # 문서 행 분리 시 컨텐츠가 비어있을경우
+        if(html_split=='' or email==''):
             try:
-                attrs = [i.attrs['href'] for i in soup.find_all("a", href=True)]
+                self.driver.get(url)
+                self.driver.implicitly_wait(10)
+                html = self.driver.page_source
+                bs = BeautifulSoup(html, 'html.parser')
+            except:
+                bs = self.change_parser(res)
+            finally:
+                content = bs.get_text('\n', strip=True)
+                html_split = content.split("\n")
+
+                # 메일 추출
+                for row in html_split:
+                    mail = re.findall(self.pattern, row)
+                    if (mail):
+                        email = mail[0]
+                        break
+
+        # 그래도 없을 경우 a태그에서 추출
+        if (email==''):
+            try:
+                attrs = [i.attrs['href'] for i in bs.find_all("a", href=True)]
                 email = list(filter(lambda x: re.findall(self.pattern, x), attrs))[0].replace("mailto:", "")
             except:
                 pass
