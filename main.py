@@ -1,5 +1,6 @@
 from selenium import webdriver
 from selenium.webdriver.common.keys import Keys
+from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.support.ui import WebDriverWait
 import pandas as pd
 import time
@@ -23,8 +24,8 @@ class jobkrSCR:
         # url 초기화
         self.init_url = "https://www.jobkorea.co.kr/recruit/joblist?menucode=local&localorder=1"
 
-        # (가상머신)드라이버 실행
-        self.driver = webdriver.Chrome('./chromedriver.exe')
+        self.driver = webdriver.Chrome(executable_path= './chromedriver.exe')
+        self.driver.implicitly_wait(10)
         self.driver.set_page_load_timeout(10)
         self.headers = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/102.0.0.0 Safari/537.36'}
@@ -174,7 +175,6 @@ class jobkrSCR:
             else:
                 pagenation_link = self.driver.find_element(by=By.XPATH,value="//*[@id='dvGIPaging']/div/ul/li[%d]/a" % self.cur_page)
                 pagenation_link.send_keys(Keys.ENTER)
-            self.driver.implicitly_wait(10)
             # 목록 당 소요시간 출력
             print("한 페이지 수집 완료 | time taken : ", int(time.time() - start), "s")
 
@@ -200,7 +200,6 @@ class jobkrSCR:
             # 기업별 잡코리아 링크 응답한 경우 vs 응답하지 못한 경우
             try:
                 self.driver.get(href)
-                self.driver.implicitly_wait(10)
             except:
                 co_info_list = self.none_data
                 self.co_items.append(co_info_list)
@@ -220,11 +219,9 @@ class jobkrSCR:
                     co_info_list = self.none_data
 
                 self.co_items.append(co_info_list)
-                self.driver.implicitly_wait(10)
             except:
                 try:
                     # 캡차 있는지 체크
-                    self.driver.implicitly_wait(10)
                     self.driver.execute_script('showCaptchaImage(true)')
 
                     # 캡차 있다면 API 실행
@@ -246,7 +243,6 @@ class jobkrSCR:
                     co_info_list = self.none_data
                 # 리스트에 담기
                 self.co_items.append(co_info_list)
-                self.driver.implicitly_wait(10)
 
                 pass
 
@@ -267,7 +263,6 @@ class jobkrSCR:
 
             submit_btn = self.driver.find_element(by=By.ID, value="btnInput")
             submit_btn.send_keys(Keys.ENTER)
-            self.driver.implicitly_wait(10)
         except:
             pass
 
@@ -278,7 +273,6 @@ class jobkrSCR:
             file.write(img)
 
     def captcha_next_btn(self):
-        self.driver.implicitly_wait(10)
         self.driver.execute_script('showCaptchaImage(true)')
 
     # ----------------- 최종 수집(이메일 스크랩) --------------------------
@@ -303,7 +297,7 @@ class jobkrSCR:
             email = 'None'
             if u!='-':
                 try:
-                    response = self.connect_url(u) #기업링크에 연결 요청, 100초가 지나면 연결하지않음
+                    response = self.connect_url(u, 10) #기업링크에 연결 요청, 10초가 지나면 연결하지않음
                     soup = BeautifulSoup(response.content, "html.parser")
                 except:
                     email = 'None' #기업링크 연결 요청이 안 될 경우 이메일 수집 포기
@@ -312,7 +306,7 @@ class jobkrSCR:
                     if(email=='None' or email=='' or email==False):
                         redirect_url = self.redirect_url_return(u)
                         try:
-                            response = self.connect_url(redirect_url)  # 기업링크에 연결 요청, 100초가 지나면 연결하지않음
+                            response = self.connect_url(redirect_url, 10)  # 기업링크에 연결 요청, 10초가 지나면 연결하지않음
                             soup = BeautifulSoup(response.content, "html.parser")
                         except:
                             email = 'None'
@@ -391,8 +385,8 @@ class jobkrSCR:
 
     # 메타태그로 인해 리다이렉트시 새 url 리턴
     def redirect_url_return(self, url):
-        # 기업링크에 연결 요청, 100초가 지나면 연결하지않음
-        response = self.connect_url(url)
+        # 기업링크에 연결 요청, 5초가 지나면 연결하지않음
+        response = self.connect_url(url, 10)
         soup = BeautifulSoup(response.content, "html.parser")
 
         try:
@@ -436,7 +430,6 @@ class jobkrSCR:
         if(html_split=='' or email==''):
             try:
                 self.driver.get(url)
-                self.driver.implicitly_wait(10)
                 html = self.driver.page_source
                 bs = BeautifulSoup(html, 'html.parser')
             except:
@@ -454,7 +447,7 @@ class jobkrSCR:
             try:
                 new_url = urljoin(url, frame['src'])
 
-                bs = BeautifulSoup(self.connect_url(new_url).content, "html.parser")
+                bs = BeautifulSoup(self.connect_url(new_url,10).content, "html.parser")
 
                 content = bs.get_text('\n', strip=True)
                 html_split = content.split("\n")
@@ -475,6 +468,10 @@ class jobkrSCR:
                 email = list(filter(lambda x: re.findall(self.pattern, x), attrs))[0].replace("mailto:", "")
             except:
                 pass
+
+        if (len(self.driver.window_handles) > 1):
+            self.close_popup(self.driver)
+
         return email
 
 
@@ -485,8 +482,8 @@ class jobkrSCR:
 
 
     # 웹 연결 요청
-    def connect_url(self, url):
-        response = requests.get(url, timeout=100, headers=self.headers)
+    def connect_url(self, url, timeout):
+        response = requests.get(url, timeout=timeout, headers=self.headers)
         return response
 
 
@@ -505,6 +502,14 @@ class jobkrSCR:
                 return email
         return email
 
+    def close_popup(self, driver):
+        tabs = driver.window_handles
+        last_tab = driver.window_handles[-1]
+        while len(tabs)!=1:
+            driver.switch_to.window(last_tab)
+            driver.close()
+            tabs = self.driver.window_handles
+        driver.switch_to.window(tabs[0])
 obj = jobkrSCR()
 while True:
     status = obj.print_menu()
