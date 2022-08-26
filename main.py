@@ -13,6 +13,7 @@ from twocaptcha import TwoCaptcha
 import os
 import glob
 from requests.exceptions import ConnectionError
+from urllib.parse import urljoin
 
 class jobkrSCR:
     def __init__(self):
@@ -302,7 +303,7 @@ class jobkrSCR:
             email = 'None'
             if u!='-':
                 try:
-                    response = requests.get(u, timeout=100, headers=self.headers) #기업링크에 연결 요청, 100초가 지나면 연결하지않음
+                    response = self.connect_url(u) #기업링크에 연결 요청, 100초가 지나면 연결하지않음
                     soup = BeautifulSoup(response.content, "html.parser")
                 except:
                     email = 'None' #기업링크 연결 요청이 안 될 경우 이메일 수집 포기
@@ -311,8 +312,7 @@ class jobkrSCR:
                     if(email=='None' or email=='' or email==False):
                         redirect_url = self.redirect_url_return(u)
                         try:
-                            response = requests.get(redirect_url, timeout=100,
-                                                    headers=self.headers)  # 기업링크에 연결 요청, 100초가 지나면 연결하지않음
+                            response = self.connect_url(redirect_url)  # 기업링크에 연결 요청, 100초가 지나면 연결하지않음
                             soup = BeautifulSoup(response.content, "html.parser")
                         except:
                             email = 'None'
@@ -392,7 +392,7 @@ class jobkrSCR:
     # 메타태그로 인해 리다이렉트시 새 url 리턴
     def redirect_url_return(self, url):
         # 기업링크에 연결 요청, 100초가 지나면 연결하지않음
-        response = requests.get(url, timeout=100, headers=self.headers)
+        response = self.connect_url(url)
         soup = BeautifulSoup(response.content, "html.parser")
 
         try:
@@ -430,11 +430,7 @@ class jobkrSCR:
         html_split = content.split("\n")
 
         # 메일 추출
-        for row in html_split:
-            mail = re.findall(self.pattern, row)
-            if (mail):
-                email = mail[0]
-                break
+        email = self.find_email(html_split)
 
         # 문서 행 분리 시 컨텐츠가 비어있을경우
         if(html_split=='' or email==''):
@@ -450,11 +446,27 @@ class jobkrSCR:
                 html_split = content.split("\n")
 
                 # 메일 추출
-                for row in html_split:
-                    mail = re.findall(self.pattern, row)
-                    if (mail):
-                        email = mail[0]
-                        break
+                email = self.find_email(html_split)
+
+        # iframe/frame 체크
+        if (email=='' and bs.find(['frame','iframe'],src=True)):
+            frame = bs.find(['frame','iframe'], src=True)
+            try:
+                new_url = urljoin(url, frame['src'])
+
+                bs = BeautifulSoup(self.connect_url(new_url).content, "html.parser")
+
+                content = bs.get_text('\n', strip=True)
+                html_split = content.split("\n")
+
+                # 메일 추출
+                email = self.find_email(html_split)
+            except:
+                pass
+
+        # html코드를 스플릿 하지 못해서 못 찾은 경우
+        if (email == ''):
+            email = self.find_email(bs, 'prettify')
 
         # 그래도 없을 경우 a태그에서 추출
         if (email==''):
@@ -465,10 +477,33 @@ class jobkrSCR:
                 pass
         return email
 
+
     # html 문서 변환 형식 변경
     def change_parser(self,res):
         soup = BeautifulSoup(res, "html5lib")
         return soup
+
+
+    # 웹 연결 요청
+    def connect_url(self, url):
+        response = requests.get(url, timeout=100, headers=self.headers)
+        return response
+
+
+    # 스플릿된 뷰티풀 수프 객체를 나누고, 이메일 정규식을 적용하여 이메일 주소를 리턴
+    def find_email(self, html_split, opt=''):
+        email = ''
+        if(opt=='prettify'):
+            new_split = html_split.prettify().split("\n")
+        else:
+            new_split = html_split
+
+        for row in new_split:
+            mail = re.findall(self.pattern, row)
+            if (mail):
+                email = mail[0]
+                return email
+        return email
 
 obj = jobkrSCR()
 while True:
