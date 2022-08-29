@@ -1,7 +1,5 @@
 from selenium import webdriver
 from selenium.webdriver.common.keys import Keys
-from selenium.webdriver.chrome.options import Options
-from selenium.webdriver.support.ui import WebDriverWait
 import pandas as pd
 import time
 from datetime import datetime
@@ -13,7 +11,7 @@ from selenium.webdriver.common.by import By
 from twocaptcha import TwoCaptcha
 import os
 import glob
-from requests.exceptions import ConnectionError
+import numpy as np
 from urllib.parse import urljoin
 
 class jobkrSCR:
@@ -349,7 +347,15 @@ class jobkrSCR:
 
         # 이메일 정규식
         merge_df['이메일'] = merge_df['이메일'].str.replace(junk_txt, '', regex=True)
-        merge_df = merge_df[merge_df['이메일']!='None']
+
+        # 이메일이 없는 셀 제거
+        merge_df = merge_df.loc[~merge_df['이메일'].isin(['None', ' ', None, '', np.NaN])]
+
+        # 파일 이름이(~.jpg, ~.png) 검출된 경우 제거 & font 파일이 검출된 경우
+        merge_df = merge_df[~merge_df['이메일'].str.match('(^.*.(jpg|png)$)|(^.*.\d$)')]
+        merge_df = merge_df[~merge_df['이메일'].str.contains('font')]
+
+        # 최종 저장
         merge_df.to_excel("./전처리 완료 결과/이메일 전처리" + datetime.today().strftime("%Y%m%d%H%M%S") + ".xlsx", index=False)
 
 
