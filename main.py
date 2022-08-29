@@ -434,6 +434,9 @@ class jobkrSCR:
                 bs = BeautifulSoup(html, 'html.parser')
             except:
                 bs = self.change_parser(res)
+            else:
+                if (len(self.driver.window_handles) > 1):
+                    self.close_popup(self.driver)
             finally:
                 content = bs.get_text('\n', strip=True)
                 html_split = content.split("\n")
@@ -469,9 +472,6 @@ class jobkrSCR:
             except:
                 pass
 
-        if (len(self.driver.window_handles) > 1):
-            self.close_popup(self.driver)
-
         return email
 
 
@@ -505,11 +505,14 @@ class jobkrSCR:
     def close_popup(self, driver):
         tabs = driver.window_handles
         last_tab = driver.window_handles[-1]
-        while len(tabs)!=1:
-            driver.switch_to.window(last_tab)
-            driver.close()
-            tabs = self.driver.window_handles
-        driver.switch_to.window(tabs[0])
+        try:
+            while len(tabs)!=1:
+                driver.switch_to.window(last_tab)
+                driver.close()
+                tabs = self.driver.window_handles
+            driver.switch_to.window(tabs[0])
+        except:
+            pass
 obj = jobkrSCR()
 while True:
     status = obj.print_menu()
