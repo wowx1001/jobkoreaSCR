@@ -513,6 +513,8 @@ class jobkrSCR:
             driver.switch_to.window(tabs[0])
         except:
             pass
+        finally:
+            driver.switch_to.window(tabs[0])
 obj = jobkrSCR()
 while True:
     status = obj.print_menu()
