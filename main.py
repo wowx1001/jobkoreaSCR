@@ -54,7 +54,7 @@ class jobkrSCR:
         print('1. 1차 수집 시작')
         print('2. 2차 수집 시작')
         print('3. 이메일 스크랩 시작')
-        print('4. 최종 산출물 전처리')
+        print('4. 3번 결과 통합 + 데이터 전처리')
         print('5. 종료')
         print('-------------------------------------')
 
@@ -290,31 +290,31 @@ class jobkrSCR:
     def scrap_3rd(self):
         comp_email = []
 
-        for u in self.sch[3]:
-            start = time.time()
-            email = 'None'
-            if u!='-':
-                try:
-                    response = self.connect_url(u, 10) #기업링크에 연결 요청, 10초가 지나면 연결하지않음
-                    soup = BeautifulSoup(response.content, "html.parser")
-                except:
-                    email = 'None' #기업링크 연결 요청이 안 될 경우 이메일 수집 포기
-                else:
-                    email = self.soup_scrap(bs = soup, url = u)
-                    if(email=='None' or email=='' or email==False):
-                        redirect_url = self.redirect_url_return(u)
-                        try:
-                            response = self.connect_url(redirect_url, 10)  # 기업링크에 연결 요청, 10초가 지나면 연결하지않음
-                            soup = BeautifulSoup(response.content, "html.parser")
-                        except:
-                            email = 'None'
-                        else:
-                            email = self.soup_scrap(bs = soup, url = redirect_url)
-                finally:
-                    comp_email.append(email)
+        u='https://supertree.co/'
+        start = time.time()
+        email = 'None'
+        if u!='-':
+            try:
+                response = self.connect_url(u, 10) #기업링크에 연결 요청, 10초가 지나면 연결하지않음
+                soup = BeautifulSoup(response.content, "html.parser")
+            except:
+                email = 'None' #기업링크 연결 요청이 안 될 경우 이메일 수집 포기
             else:
+                email = self.soup_scrap(bs = soup, url = u)
+                if(email=='None' or email=='' or email==False):
+                    redirect_url = self.redirect_url_return(u)
+                    try:
+                        response = self.connect_url(redirect_url, 10)  # 기업링크에 연결 요청, 10초가 지나면 연결하지않음
+                        soup = BeautifulSoup(response.content, "html.parser")
+                    except:
+                        email = 'None'
+                    else:
+                        email = self.soup_scrap(bs = soup, url = redirect_url)
+            finally:
                 comp_email.append(email)
-            print(u, " : ", int(time.time() - start), "s, email: ", email)
+        else:
+            comp_email.append(email)
+        print(u, " : ", int(time.time() - start), "s, email: ", email)
 
         # 이메일 수집 결과와 2차 수집 데이터프레임 병합
         last_em_df = pd.DataFrame(comp_email)
@@ -323,8 +323,10 @@ class jobkrSCR:
         dir_path = datetime.today().strftime("%Y-%m-%d_이메일_수집_결과")
         self.createDirectory(dir_path)
 
-        # 이메일 수집 결과 저장
+        # 이메일 수집 결과 전처리&저장
         self.sch = pd.concat([self.sch, last_em_df], axis=1)
+
+        self.sch = self.pretreatment(self.sch)
         self.sch.to_excel("./results/" + dir_path + "/이메일_수집_결과" + datetime.today().strftime("%Y%m%d%H%M%S") + ".xlsx",
                           index=False)
 
@@ -502,7 +504,7 @@ class jobkrSCR:
                 email = mail[0]
                 return email
         return email
-    
+
     # 팝업 닫기
     def close_popup(self, driver):
         tabs = driver.window_handles
@@ -519,7 +521,7 @@ class jobkrSCR:
             driver.switch_to.window(tabs[0])
 
     # 디렉토리 생성
-    def createDirectory(directory):
+    def createDirectory(self, directory):
         try:
             if not os.path.exists("./results/"+directory):
                 os.makedirs("./results/"+directory)
@@ -536,7 +538,8 @@ class jobkrSCR:
         # 컬럼 이름 설정
         column_name = ['회사명', '산업분류', '사원수', '기업규모', '홈페이지', '주소', '이메일']
 
-        new_df = new_df.drop(columns='co_link', axis=1)
+        if(~new_df['co_link'].empty):
+            new_df = new_df.drop(columns='co_link', axis=1)
         new_df.columns = column_name
 
         # 이메일 정규식
