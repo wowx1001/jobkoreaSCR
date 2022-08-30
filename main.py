@@ -318,15 +318,15 @@ class jobkrSCR:
 
         # 이메일 수집 결과와 2차 수집 데이터프레임 병합
         last_em_df = pd.DataFrame(comp_email)
-        
+
         # 폴더 생성
         dir_path = datetime.today().strftime("%Y-%m-%d_이메일_수집_결과")
         self.createDirectory(dir_path)
-        
+
         # 이메일 수집 결과 저장
         self.sch = pd.concat([self.sch, last_em_df], axis=1)
-        self.sch.to_excel("./results/"+dir_path+"/이메일_수집_결과" + datetime.today().strftime("%Y%m%d%H%M%S") + ".xlsx", index=False)
-
+        self.sch.to_excel("./results/" + dir_path + "/이메일_수집_결과" + datetime.today().strftime("%Y%m%d%H%M%S") + ".xlsx",
+                          index=False)
 
     #최종 산출물 전처리 데이터 병합&중복처리
     def run_4th_script(self):
@@ -497,7 +497,10 @@ class jobkrSCR:
 
     # 웹 연결 요청
     def connect_url(self, url, timeout):
-        response = requests.get(url, timeout=timeout, headers=self.headers)
+        try:
+            response = requests.get(url, timeout=timeout, headers=self.headers, verify=False)
+        except:
+            response = ''
         return response
 
 
@@ -529,14 +532,14 @@ class jobkrSCR:
             pass
         finally:
             driver.switch_to.window(tabs[0])
-            
+
     def createDirectory(directory):
         try:
             if not os.path.exists("./results/"+directory):
                 os.makedirs("./results/"+directory)
         except OSError:
             print("Error: Failed to create the directory.")
-            
+
 obj = jobkrSCR()
 while True:
     status = obj.print_menu()
