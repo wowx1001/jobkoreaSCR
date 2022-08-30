@@ -330,41 +330,25 @@ class jobkrSCR:
 
     #최종 산출물 전처리 데이터 병합&중복처리
     def run_4th_script(self):
-        # 전처리
+        # 초기화
         merge_df = pd.DataFrame()
 
-        # 불필요한 텍스트 목록
-        junk_txt = "Email|e-mail|E-mail|email.|Email.|email:|Email:|e-mail:|E-mail:|e-mail.|E-mail.|E-MAIL|.email|.Email|EMAIL|FAX|Tel.|Tel:|tel.|TEL.|tel:|TEL:|Copyrights|copyrights|COPYRIGHTS|Copyright|COPYRIGHT|copyright|E."
-
         # 파일명이 기업정보_최종_산출물로 시작하는 엑셀 파일(.xlsx) 전부 로드해오기
-        file_format = ".xlsx"
         file_path = "./results"
-        file_list = [f"./results/{file}" for file in os.listdir(file_path) if
-                     file_format in file and re.match("기업정보_최종_산출물", file)]
-        # 컬럼 이름 설정
-        column_name = ['회사명', '산업분류', '사원수', '기업규모', '홈페이지', '주소', '이메일']
+        file_list = [f"./results/{file}/" for file in os.listdir(file_path)
+                     if re.match("\d{4}-\d{2}-\d{2}_이메일_수집_결과", file)]
 
         # results 폴더에 있는 엑셀 파일 병합
         for file_name in file_list:
-            file_df = pd.read_excel(file_name)
+            name = file_name + "*.xlsx"
+            file_df = pd.read_excel(os.path.normpath(glob.glob(name)[0]))
             merge_df = merge_df.append(file_df, ignore_index=True)
-            merge_df.drop_duplicates(['co_name', 'co_link'])  # 회사명, 회사별 잡코리아 링크에 따라 중복제거
+            merge_df = merge_df.drop_duplicates(['co_name', 'co_link'])
 
-        merge_df = merge_df.drop(columns='co_link', axis=1)
-        merge_df.columns = column_name
-
-        # 이메일 정규식
-        merge_df['이메일'] = merge_df['이메일'].str.replace(junk_txt, '', regex=True)
-
-        # 이메일이 없는 셀 제거
-        merge_df = merge_df.loc[~merge_df['이메일'].isin(['None', ' ', None, '', np.NaN])]
-
-        # 파일 이름이(~.jpg, ~.png) 검출된 경우 제거 & font 파일이 검출된 경우
-        merge_df = merge_df[~merge_df['이메일'].str.match('(^.*.(jpg|png)$)|(^.*.\d$)')]
-        merge_df = merge_df[~merge_df['이메일'].str.contains('font')]
+        merge_df = self.pretreatment(merge_df)
 
         # 최종 저장
-        merge_df.to_excel("./전처리 완료 결과/이메일 전처리" + datetime.today().strftime("%Y%m%d%H%M%S") + ".xlsx", index=False)
+        merge_df.to_excel("./전처리 완료 결과/파일 통합 + 이메일 전처리" + datetime.today().strftime("%Y%m%d%H%M%S") + ".xlsx", index=False)
 
 
     # 최근 파일 불러오기
@@ -518,7 +502,8 @@ class jobkrSCR:
                 email = mail[0]
                 return email
         return email
-
+    
+    # 팝업 닫기
     def close_popup(self, driver):
         tabs = driver.window_handles
         last_tab = driver.window_handles[-1]
@@ -533,12 +518,38 @@ class jobkrSCR:
         finally:
             driver.switch_to.window(tabs[0])
 
+    # 디렉토리 생성
     def createDirectory(directory):
         try:
             if not os.path.exists("./results/"+directory):
                 os.makedirs("./results/"+directory)
         except OSError:
             print("Error: Failed to create the directory.")
+
+    # 데이터프레임 전처리
+    def pretreatment(self, df):
+        new_df = df
+
+        # 쓰레기 텍스트 목록 설정
+        junk_txt = "Email|e-mail|E-mail|email.|Email.|email:|Email:|e-mail:|E-mail:|e-mail.|E-mail.|E-MAIL|.email|.Email|EMAIL|FAX|Tel.|Tel:|tel.|TEL.|tel:|TEL:|Copyrights|copyrights|COPYRIGHTS|Copyright|COPYRIGHT|copyright|E."
+
+        # 컬럼 이름 설정
+        column_name = ['회사명', '산업분류', '사원수', '기업규모', '홈페이지', '주소', '이메일']
+
+        new_df = new_df.drop(columns='co_link', axis=1)
+        new_df.columns = column_name
+
+        # 이메일 정규식
+        new_df['이메일'] = new_df['이메일'].str.replace(junk_txt, '', regex=True)
+
+        # 이메일이 없는 셀 제거
+        new_df = new_df.loc[~new_df['이메일'].isin(['None', ' ', None, '', np.NaN])]
+
+        # 파일 이름이(~.jpg, ~.png) 검출된 경우 제거 & font 파일이 검출된 경우
+        new_df = new_df[~new_df['이메일'].str.match('(^.*.(jpg|png)$)|(^.*.\d$)')]
+        new_df = new_df[~new_df['이메일'].str.contains('font')]
+
+        return new_df
 
 obj = jobkrSCR()
 while True:
