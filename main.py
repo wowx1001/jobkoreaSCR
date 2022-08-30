@@ -70,7 +70,7 @@ class jobkrSCR:
             print('이메일 스크랩 시작')
             self.run_3rd_script()
         elif input_num == 4:
-            print('최종 산출물 전처리 시작')
+            print('모든 데이터 통합 + 데이터 전처리 시작')
             self.run_4th_script()
         elif input_num == 5:
             return False
@@ -290,31 +290,34 @@ class jobkrSCR:
     def scrap_3rd(self):
         comp_email = []
 
-        u='https://supertree.co/'
-        start = time.time()
-        email = 'None'
-        if u!='-':
-            try:
-                response = self.connect_url(u, 10) #기업링크에 연결 요청, 10초가 지나면 연결하지않음
-                soup = BeautifulSoup(response.content, "html.parser")
-            except:
-                email = 'None' #기업링크 연결 요청이 안 될 경우 이메일 수집 포기
+        for u in self.sch[3]:
+            start = time.time()
+            email = 'None'
+            if u!='-':
+                try:
+                    response = self.connect_url(u, 10) #기업링크에 연결 요청, 10초가 지나면 연결하지않음
+                    soup = BeautifulSoup(response.content, "html.parser")
+                except:
+                    email = 'None' #기업링크 연결 요청이 안 될 경우 이메일 수집 포기
+                else:
+                    email = self.soup_scrap(bs = soup, url = u)
+                    if(email=='None' or email=='' or email==False):
+                        redirect_url = self.redirect_url_return(u)
+                        if(redirect_url):
+                            try:
+                                response = self.connect_url(redirect_url, 10)  # 기업링크에 연결 요청, 10초가 지나면 연결하지않음
+                                soup = BeautifulSoup(response.content, "html.parser")
+                            except:
+                                email = 'None'
+                            else:
+                                email = self.soup_scrap(bs = soup, url = redirect_url)
+                        else:
+                            email = 'None'
+                finally:
+                    comp_email.append(email)
             else:
-                email = self.soup_scrap(bs = soup, url = u)
-                if(email=='None' or email=='' or email==False):
-                    redirect_url = self.redirect_url_return(u)
-                    try:
-                        response = self.connect_url(redirect_url, 10)  # 기업링크에 연결 요청, 10초가 지나면 연결하지않음
-                        soup = BeautifulSoup(response.content, "html.parser")
-                    except:
-                        email = 'None'
-                    else:
-                        email = self.soup_scrap(bs = soup, url = redirect_url)
-            finally:
                 comp_email.append(email)
-        else:
-            comp_email.append(email)
-        print(u, " : ", int(time.time() - start), "s, email: ", email)
+            print(u, " : ", int(time.time() - start), "s, email: ", email)
 
         # 이메일 수집 결과와 2차 수집 데이터프레임 병합
         last_em_df = pd.DataFrame(comp_email)
@@ -345,7 +348,7 @@ class jobkrSCR:
             name = file_name + "*.xlsx"
             file_df = pd.read_excel(os.path.normpath(glob.glob(name)[0]))
             merge_df = merge_df.append(file_df, ignore_index=True)
-            merge_df = merge_df.drop_duplicates(['co_name', 'co_link'])
+            merge_df = merge_df.drop_duplicates(['회사명', '이메일'])
 
         merge_df = self.pretreatment(merge_df)
 
@@ -385,8 +388,10 @@ class jobkrSCR:
 
     # 메타태그로 인해 리다이렉트시 새 url 리턴
     def redirect_url_return(self, url):
-        # 기업링크에 연결 요청, 5초가 지나면 연결하지않음
+        # 기업링크에 연결 요청, 10초가 지나면 연결하지않음
         response = self.connect_url(url, 10)
+        if(not response):
+            return False
         soup = BeautifulSoup(response.content, "html.parser")
 
         try:
@@ -486,7 +491,7 @@ class jobkrSCR:
         try:
             response = requests.get(url, timeout=timeout, headers=self.headers, verify=False)
         except:
-            response = ''
+            response = False
         return response
 
 
@@ -538,7 +543,7 @@ class jobkrSCR:
         # 컬럼 이름 설정
         column_name = ['회사명', '산업분류', '사원수', '기업규모', '홈페이지', '주소', '이메일']
 
-        if(~new_df['co_link'].empty):
+        if('co_link' in new_df.columns):
             new_df = new_df.drop(columns='co_link', axis=1)
         new_df.columns = column_name
 
